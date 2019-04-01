@@ -3,7 +3,9 @@ var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
     secrets = require('./config/secrets'),
-    bodyParser = require('body-parser');
+    bodyParser = require('body-parser'),
+    Task = require('./models/task'),
+    User = require('./models/user');
 
 // Create our Express application
 var app = express();
