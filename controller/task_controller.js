@@ -94,17 +94,29 @@ exports.create_a_task = function(req, res) {
     var new_task = new Task(req.body);
     new_task.save()
             .then(task => {
+                res.status(201).json({
+                    message: 'OK',
+                    data: task
+                });
+                
+                /*
+                This part of the code can insert the id of new added pending task into user's pendingTasks list
+                If using dbFill.py to add new data automatically, we do not need this part
+                When adding personal task into the database, just uncomment this part 
+                */
+               /*
                 var uid = task.assignedUser;
-                if(!task.completed){
+                if(!task.completed && uid != ""){
                     User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
                         .exec()
                         .then(result => {
-                            res.status(200).json({
+                            res.status(201).json({
                                 message: 'OK',
                                 data: task
                             });
                         })
                         .catch(err => {
+                            console.log(err);
                             res.status(500).json({
                                 message: "Update the task list failed",
                                 data: []
@@ -116,6 +128,7 @@ exports.create_a_task = function(req, res) {
                         data: task
                     });
                 }
+                */
             })
             .catch(err => {
                 console.log(err);
@@ -188,13 +201,14 @@ exports.delete_a_task = function(req, res) {
     Task.findByIdAndRemove(req.params.id)
         .exec()
         .then(task => {
-            var uid = task.assignedUser;
-            User.findByIdAndUpdate( uid, { $pull: {pendingTasks: task._id} }, { new: true })
+            let uid = task.assignedUser;
+            if(!task.completed){
+                User.findByIdAndUpdate( uid, { $pull: {pendingTasks: task._id} }, { new: true })
                 .exec()
                 .then(result => {
                     res.status(200).json({
                         message: 'OK',
-                        data: result
+                        data: task
                     });
                 })
                 .catch(err => {
@@ -203,6 +217,12 @@ exports.delete_a_task = function(req, res) {
                         data: []
                     });
                 })
+            } else {
+                res.status(200).json({
+                    message: 'OK',
+                    data: task
+                });
+            }
         })
         .catch( err => {
             res.status(500).json({

@@ -28,7 +28,6 @@ exports.list_all_users = function(req, res) {
     }
     // with filter conditions
     var q = parseUrl.query;
-    console.log(q);
     var q_where = q.where;
     var q_sort = q.sort;
     var q_select = q.select;
@@ -36,7 +35,6 @@ exports.list_all_users = function(req, res) {
     var q_limit = q.limit || 100;
     var q_count = q.count;
     var users = User.find();
-    console.log(users);
     if (q_where){
         users = users.where(JSON.parse(q_where));
     }
@@ -99,7 +97,7 @@ exports.create_a_user = function(req, res) {
                 data: []
             });
         } else {
-            return res.status(200).json({
+            return res.status(201).json({
                 message: 'OK',
                 data: user
             });
@@ -129,56 +127,68 @@ exports.read_a_user = function(req, res) {
 }
 
 exports.update_a_user = function(req, res) {
-    User.findById(req.params.id, function(err, user) {
-        if(err) {
-            return res.status(500).json({
+    let uid = req.params.id;
+    User.findByIdAndUpdate( uid, { $set: req.body }, { new: true } )
+        .exec()
+        .then( user => {
+            if("name" in req.body){
+                Task.update({assignedUser: uid}, { $set: {assignedUserName: req.body.name} }, {multi: true })
+                    .exec()
+                    .then(task => {
+                    res.status(200).json({
+                        message: "OK",
+                        data: user
+                    });
+                })
+                .catch(err => {
+                    res.status(500).json({
+                        message: "Update user name in tasks failed",
+                        data: []
+                    });
+                });
+            }
+        })
+        .catch( err => {
+            res.status(500).json({
                 message: "Update request failed",
                 data: []
             });
-        } else if (user == null || user.length == 0) {
-            return res.status(404).json({
-                message: "Cannot find the user",
-                data: []
-            });
-        } else {
-            user.name = req.body.name || user.name;
-            user.email = req.body.email || user.email;
-            user.pendingTasks = req.body.pendingTasks || user.pendingTasks;
-            user.dateCreated = req.body.dateCreated || user.dateCreated;
-            user.save(function(err) {
-                if (err) {
-                    return res.status(500).json({
-                        message: "Update a user failed",
-                        data: []
-                    });
-                } else {
-                    return res.status(200).json({
-                        message: 'OK',
-                        data: user
-                    });
-                }
-            });
-        }
-    });
+        });
 }
 
 exports.delete_a_user = function(req, res) {
-    User.findByIdAndRemove(req.params.id, function(err, user) {
-        if(err) {
-            return res.status(500).json({
+    User.findByIdAndRemove(req.params.id)
+        .exec()
+        .then(user => {
+            if (user == null || user.length == 0) {
+                res.status(404).json({
+                    message: "Cannot find the user",
+                    data: []
+                });
+            } else {
+                let uid = user._id;
+                Task.remove({ 'assignedUser': uid })
+                    .exec()
+                    .then(task => {
+                        res.status(200).json({
+                            message: "OK",
+                            data: user
+                        });
+                    })
+                    .catch(err => {
+                        console.log(err);
+                        res.status(500).json({
+                            message: "Delete all task made by user failed",
+                            data: []
+                        });
+                    });
+            }
+        })
+        .catch(err => {
+            console.log(err);
+            res.status(500).json({
                 message: "Delete request failed",
                 data: []
             });
-        } else if (user == null || user.length == 0) {
-            return res.status(404).json({
-                message: "Cannot find the user",
-                data: []
-            });
-        } else {
-            return res.status(200).json({
-                message: "OK",
-                data: user
-            });
-        }
-    });
+        })
 }

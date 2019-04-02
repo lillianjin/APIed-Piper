@@ -120,7 +120,6 @@ def main(argv):
         response = conn.getresponse()
         data = response.read()
         d = json.loads(data)
-
         taskID = str(d['data']['_id'])
 
         # Make sure the task is added to the pending list of the user
