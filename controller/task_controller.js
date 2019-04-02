@@ -161,7 +161,7 @@ exports.read_a_task = function(req, res) {
 }
 
 exports.update_a_task = function(req, res) {
-    var tid = req.params.id;
+    let tid = req.params.id;
     Task.findByIdAndUpdate( tid, { $set: req.body }, { new: true } )
         .exec()
         .then( task => {
