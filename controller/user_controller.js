@@ -15,7 +15,7 @@ exports.list_all_users = function(req, res) {
                 });
             } else if (user == null || user.length == 0) {
                 return res.status(404).json({
-                    message: "Cannot find any user",
+                    message: "User not found",
                     data: []
                 });
             } else {
@@ -62,7 +62,7 @@ exports.list_all_users = function(req, res) {
             });
         } else if (user == null || user.length == 0) {
             return res.status(404).json({
-                message: "Cannot find any user",
+                message: "User not found",
                 data: []
             });
         } else {
@@ -108,13 +108,13 @@ exports.create_a_user = function(req, res) {
 exports.read_a_user = function(req, res) {
     User.findById(req.params.id, function(err, user) {
         if(err) {
-            return res.status(500).json({
-                message: "Request for a user failed",
+            return res.status(404).json({
+                message: "Request for a user failed, user not found",
                 data: []
             });
         } else if (user == null || user.length == 0) {
             return res.status(404).json({
-                message: "Cannot find the user",
+                message: "Request for a user failed, user not found",
                 data: []
             });
         } else {
@@ -131,7 +131,7 @@ exports.update_a_user = function(req, res) {
     User.findByIdAndUpdate( uid, { $set: req.body }, { new: true } )
         .exec()
         .then( user => {
-            if("name" in req.body){
+            if("name" in req.body ){
                 Task.update({assignedUser: uid}, { $set: {assignedUserName: req.body.name} }, {multi: true })
                     .exec()
                     .then(task => {
@@ -139,18 +139,18 @@ exports.update_a_user = function(req, res) {
                         message: "OK",
                         data: user
                     });
-                })
-                .catch(err => {
-                    res.status(500).json({
-                        message: "Update user name in tasks failed",
-                        data: []
+                    })
+                    .catch(err => {
+                        res.status(500).json({
+                            message: "Update user name in tasks failed",
+                            data: []
+                        });
                     });
-                });
             }
         })
         .catch( err => {
-            res.status(500).json({
-                message: "Update request failed",
+            res.status(404).json({
+                message: "Update user request failed, user not found",
                 data: []
             });
         });
@@ -162,14 +162,15 @@ exports.delete_a_user = function(req, res) {
         .then(user => {
             if (user == null || user.length == 0) {
                 res.status(404).json({
-                    message: "Cannot find the user",
+                    message: "User not found",
                     data: []
                 });
             } else {
                 let uid = user._id;
-                Task.remove({ 'assignedUser': uid })
+                Task.update({assignedUser: uid}, { $set: {assignedUserName: "unassigned", assignedUser: ""} }, {multi: true })
                     .exec()
                     .then(task => {
+                        console.log(task);
                         res.status(200).json({
                             message: "OK",
                             data: user
@@ -186,8 +187,8 @@ exports.delete_a_user = function(req, res) {
         })
         .catch(err => {
             console.log(err);
-            res.status(500).json({
-                message: "Delete request failed",
+            res.status(404).json({
+                message: "Delete a user request failed, user not found",
                 data: []
             });
         })

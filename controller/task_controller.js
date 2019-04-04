@@ -12,7 +12,7 @@ exports.list_all_tasks = function(req, res) {
             .then(task => {
                 if (task == null || task.length == 0) {
                     res.status(404).json({
-                        message: "Cannot find any task",
+                        message: "Task not found",
                         data: []
                     });
                 } else {
@@ -65,7 +65,7 @@ exports.list_all_tasks = function(req, res) {
                 });
             } else if (task == null || task.length == 0) {
                 return res.status(404).json({
-                    message: "Cannot find any task",
+                    message: "Task not found",
                     data: []
                 });
             } else {
@@ -91,52 +91,73 @@ exports.create_a_task = function(req, res) {
             data: []
         });
     }
-    var new_task = new Task(req.body);
+    let new_task = new Task(req.body);
     new_task.save()
             .then(task => {
+                /*
                 res.status(201).json({
                     message: 'OK',
                     data: task
                 });
-                
+                */
                 /*
                 This part of the code can insert the id of new added pending task into user's pendingTasks list
                 If using dbFill.py to add new data automatically, we do not need this part
                 When adding personal task into the database, just uncomment this part 
                 */
-               /*
-                var uid = task.assignedUser;
-                if(!task.completed && uid != ""){
-                    User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
-                        .exec()
-                        .then(result => {
+                let uid = task.assignedUser;
+                User.findOne({_id: uid})
+                    .exec()
+                    .then(mes => {
+                        if(mes == null){
+                            Task.findByIdAndUpdate( task._id, { $set: {assignedUserName: "unassigned", assignedUser: ""} }, { new: true })
+                                .exec()
+                                .then(result => {
+                                    res.status(201).json({
+                                        message: "user's id/name not found, set unassigned",
+                                        data: result
+                                    })
+                                })
+                                .catch(err => {
+                                    console.log(err);
+                                    res.status(500).json({
+                                        message: "Update user id when create task failed",
+                                        data: []
+                                    })
+                                });
+                        } else {
+                            if(!task.completed){
+                                User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
+                                    .exec()
+                                    .catch(err => {
+                                        console.log(err);
+                                        res.status(500).json({
+                                            message: "add the task into user's pending list failed",
+                                            data: task
+                                        });
+                                    });
+                            } 
                             res.status(201).json({
                                 message: 'OK',
                                 data: task
                             });
-                        })
-                        .catch(err => {
-                            console.log(err);
-                            res.status(500).json({
-                                message: "Update the task list failed",
-                                data: []
-                            });
-                        })
-                } else {
-                    res.status(500).json({
-                        message: 'OK',
-                        data: task
+                        }  
+                    })
+                    .catch(err => {
+                        console.log(err);
+                        res.status(500).json({
+                            message: "Create a task failed, user not exist",
+                            data: []
+                        });
                     });
-                }
-                */
-            })
+                    })
             .catch(err => {
                 console.log(err);
                 res.status(500).json({
                     message: "Create a task failed",
                     data: []
                 });
-            })
+            });            
 }
 
 exports.read_a_task = function(req, res) {
@@ -148,7 +169,7 @@ exports.read_a_task = function(req, res) {
             });
         } else if (task == null || task.length == 0) {
             return res.status(404).json({
-                message: "Cannot find the task",
+                message: "Read the task failed, task not found",
                 data: []
             });
         } else {
@@ -162,40 +183,90 @@ exports.read_a_task = function(req, res) {
 
 exports.update_a_task = function(req, res) {
     let tid = req.params.id;
-    Task.findByIdAndUpdate( tid, { $set: req.body }, { new: true } )
+    Task.findOne({_id: tid})
         .exec()
-        .then( task => {
-            if(task.completed){
-                var uid = task.assignedUser;
-                User.findByIdAndUpdate( uid, { $pull: {pendingTasks: task._id} }, { new: true })
-                    .exec()
-                    .then(result => {
-                        res.status(200).json({
-                            message: 'OK',
-                            data: task
+        .then(task => {
+            if(!task.completed && "completed" in req.body && req.body.completed){
+                Task.findByIdAndUpdate( tid, { $set: {completed: true} }, { new: true } )
+                .exec()
+                .then( task => {
+                    let uid = task.assignedUser;
+                    User.findByIdAndUpdate( uid, { $pull: {pendingTasks: tid} }, { new: true })
+                        .exec()
+                        .then(() => {
+                            delete req.body.completed;
+                        })
+                        .catch(err => {
+                            console.log(err);
+                            res.status(500).json({
+                                message: "Update the task in user's pending list failed",
+                                data: []
+                            });
                         });
+                }) 
+                .catch(err => {
+                    console.log(err);
+                    res.status(404).json({
+                        message: "Update request completed status failed",
+                        data: []
+                    });
+                });
+            } else if("assignedUser" in req.body){
+                if(task.assignedUser == req.body.assignedUser){
+                    delete req.body.assignedUser;
+                }
+                if(task.assignedUser==""){
+                    Task.findByIdAndUpdate( tid, { $set: {assignedUser: req.body.assignedUser} }, { new: true } )
+                    .exec()
+                    .then( task => {
+                        let uid = task.assignedUser;
+                        console.log(task.assignedUser,"ssssssssssssss");
+                        User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
+                            .exec()
+                            .then(() => {
+                                delete req.body.assignedUser;
+                            })
+                            .catch(err => {
+                                res.status(500).json({
+                                    message: "Update the task in user's pending list failed",
+                                    data: []
+                                });
+                            });
                     })
                     .catch(err => {
-                        res.status(500).json({
-                            message: "Update the task list failed",
+                        console.log(err);
+                        res.status(404).json({
+                            message: "Update request for assignedUser failed",
                             data: []
                         });
-                    })
-            } else {
-                res.status(500).json({
-                    message: 'OK',
-                    data: task
+                    });
+                }
+            } 
+            Task.findByIdAndUpdate( tid, { $set: req.body }, { new: true } )
+                .exec()
+                .then(result => {
+                    res.status(200).json({
+                        message: 'OK',
+                        data: result
+                    });
+                })
+                .catch(err => {
+                    console.log(err);
+                    res.status(404).json({
+                        message: "Update request failed",
+                        data: []
+                    });
                 });
-            }
-        }) 
+        })
         .catch(err => {
             console.log(err);
             res.status(500).json({
-                message: "Update request failed",
+                message: "Update request failed, task not found",
                 data: []
-            })
+            });
         });
 }
+
 
 exports.delete_a_task = function(req, res) {
     Task.findByIdAndRemove(req.params.id)
@@ -213,7 +284,7 @@ exports.delete_a_task = function(req, res) {
                 })
                 .catch(err => {
                     res.status(500).json({
-                        message: "Delete the task list failed",
+                        message: "Delete the task in pending list failed",
                         data: []
                     });
                 })
@@ -225,8 +296,8 @@ exports.delete_a_task = function(req, res) {
             }
         })
         .catch( err => {
-            res.status(500).json({
-                message: "Delete request failed",
+            res.status(404).json({
+                message: "Delete request failed, task not found",
                 data: []
             });
         })        
