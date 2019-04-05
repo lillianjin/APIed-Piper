@@ -106,51 +106,53 @@ exports.create_a_task = function(req, res) {
                 When adding personal task into the database, just uncomment this part 
                 */
                 let uid = task.assignedUser;
-                User.findOne({_id: uid})
-                    .exec()
-                    .then(mes => {
-                        if(mes == null){
-                            Task.findByIdAndUpdate( task._id, { $set: {assignedUserName: "unassigned", assignedUser: ""} }, { new: true })
-                                .exec()
-                                .then(result => {
-                                    res.status(201).json({
-                                        message: "user's id/name not found, set unassigned",
-                                        data: result
-                                    })
-                                })
-                                .catch(err => {
-                                    console.log(err);
-                                    res.status(500).json({
-                                        message: "Update user id when create task failed",
-                                        data: []
-                                    })
-                                });
-                        } else {
-                            if(!task.completed){
-                                User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
+                if(uid != ""){
+                    User.findOne({_id: uid})
+                        .exec()
+                        .then(mes => {
+                            if(mes == null || mes == ""){
+                                console.log("messsssss", mes);
+                                Task.findByIdAndUpdate( task._id, { $set: {assignedUserName: "unassigned", assignedUser: ""} }, { new: true })
                                     .exec()
+                                    .then(result => {
+                                        res.status(201).json({
+                                            message: "user's id/name not found, set unassigned",
+                                            data: result
+                                        })
+                                    })
                                     .catch(err => {
                                         console.log(err);
                                         res.status(500).json({
-                                            message: "add the task into user's pending list failed",
-                                            data: task
-                                        });
+                                            message: "Update user id when create task failed",
+                                            data: []
+                                        })
                                     });
-                            } 
-                            res.status(201).json({
-                                message: 'OK',
-                                data: task
+                            } else {
+                                if(!task.completed){
+                                    User.findByIdAndUpdate( uid, { $push: {pendingTasks: task._id} }, { new: true })
+                                        .exec()
+                                        .catch(err => {
+                                            console.log(err);
+                                            res.status(500).json({
+                                                message: "add the task into user's pending list failed",
+                                                data: task
+                                            });
+                                        });
+                                } 
+                            }  
+                        })
+                        .catch(err => {
+                            res.status(500).json({
+                                message: "Create a task failed, user not exist",
+                                data: []
                             });
-                        }  
-                    })
-                    .catch(err => {
-                        console.log(err);
-                        res.status(500).json({
-                            message: "Create a task failed, user not exist",
-                            data: []
                         });
+                    }
+                    res.status(201).json({
+                        message: 'OK',
+                        data: task
                     });
-                    })
+                })
             .catch(err => {
                 console.log(err);
                 res.status(500).json({
